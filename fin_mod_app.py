@@ -10,25 +10,19 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Mortgage Roulette", layout="wide", initial_sidebar_state="collapsed")
 
-# ---------- UI polish ----------
 st.markdown(
     """
     <style>
     .block-container {
-        padding-top: 1.5rem;
-        padding-bottom: 1.5rem;
+        padding-top: 1.2rem;
+        padding-bottom: 1.4rem;
         max-width: 1280px;
     }
-    h1, h2, h3 {
-        letter-spacing: -0.02em;
-    }
+    h1, h2, h3 { letter-spacing: -0.02em; }
     .subtle {
         color: #6b7280;
         font-size: 0.95rem;
         line-height: 1.45;
-    }
-    [data-testid="stMetricValue"] {
-        font-size: 1.5rem;
     }
     .section-card {
         padding: 0.9rem 1rem;
@@ -37,22 +31,37 @@ st.markdown(
         background: rgba(250,250,252,0.72);
         margin-bottom: 0.9rem;
     }
-    div[data-testid="stTabs"] button {
-        white-space: nowrap;
+    .scenario-summary {
+        padding: 0.85rem 0.95rem;
+        border: 1px solid rgba(49,51,63,0.12);
+        border-radius: 12px;
+        background: #fff;
+        height: 100%;
     }
+    .scenario-summary h4 {
+        margin: 0 0 0.55rem 0;
+        font-size: 1rem;
+    }
+    .scenario-kv {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.25rem 0.75rem;
+        font-size: 0.92rem;
+    }
+    .scenario-kv div:nth-child(odd) { color: #6b7280; }
+    .scenario-kv div:nth-child(even) { font-weight: 600; }
+    [data-testid="stMetricValue"] { font-size: 1.45rem; }
     @media (max-width: 768px) {
         .block-container {
-            padding-top: 0.75rem;
+            padding-top: 0.7rem;
             padding-bottom: 1rem;
             padding-left: 0.75rem;
             padding-right: 0.75rem;
         }
-        h1 { font-size: 1.65rem; }
-        h2 { font-size: 1.2rem; }
-        h3 { font-size: 1.05rem; }
-        .subtle { font-size: 0.88rem; }
-        [data-testid="stMetricValue"] { font-size: 1.15rem; }
-        .section-card {
+        h1 { font-size: 1.6rem; }
+        h2 { font-size: 1.15rem; }
+        .subtle { font-size: 0.87rem; }
+        .section-card, .scenario-summary {
             padding: 0.75rem 0.8rem;
             border-radius: 10px;
         }
@@ -62,6 +71,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
+# =========================
+# HELPERS
+# =========================
 
 def render_chart_with_actions(fig: go.Figure, chart_key: str, title: str):
     chart_json = fig.to_json()
@@ -74,7 +87,11 @@ def render_chart_with_actions(fig: go.Figure, chart_key: str, title: str):
             "displayModeBar": True,
             "displaylogo": False,
             "responsive": True,
-            "toImageButtonOptions": {"format": "png", "filename": chart_key, "scale": 2},
+            "toImageButtonOptions": {
+                "format": "png",
+                "filename": chart_key,
+                "scale": 2,
+            },
         },
         key=f"plot_{chart_key}",
     )
@@ -99,11 +116,15 @@ def render_chart_with_actions(fig: go.Figure, chart_key: str, title: str):
         """
         components.html(button_html, height=44)
 
-    st.caption(f"Use the modebar on the chart to download a PNG. Use Download HTML or Copy chart JSON below for sharing.")
+    st.caption("Use the chart modebar for PNG download. HTML and JSON options are below.")
+
+
+def fmt_gbp(x: float) -> str:
+    return f"£{x:,.0f}"
 
 
 # =========================
-# STAMP DUTY FUNCTIONS
+# STAMP DUTY
 # =========================
 
 def england_stamp_duty_standard(property_price: float) -> float:
@@ -153,7 +174,7 @@ class Scenario:
 
 
 # =========================
-# CORE FINANCE FUNCTIONS
+# CORE FINANCE
 # =========================
 
 def monthly_payment(principal: float, annual_rate: float, term_years: int) -> float:
@@ -164,6 +185,88 @@ def monthly_payment(principal: float, annual_rate: float, term_years: int) -> fl
     return principal * (r * (1 + r) ** n) / ((1 + r) ** n - 1)
 
 
+def max_loan_from_target_mortgage_payment(target_mortgage_payment: float, annual_rate: float, term_years: int) -> float:
+    r = annual_rate / 100 / 12
+    n = term_years * 12
+    if r == 0:
+        return target_mortgage_payment * n
+    return target_mortgage_payment * ((1 + r) ** n - 1) / (r * (1 + r) ** n)
+
+
+def required_cash_for_target_mortgage_payment(
+    scenario_name: str,
+    property_price: float,
+    annual_rate: float,
+    term_years: int,
+    target_mortgage_payment: float,
+    fees: dict,
+    annual_costs: dict,
+    stamp_duty_func,
+) -> dict:
+    max_loan = max_loan_from_target_mortgage_payment(target_mortgage_payment, annual_rate, term_years)
+    deposit_required = max(property_price - max_loan, 0.0)
+    fees_total = sum(fees.values())
+    stamp_duty = stamp_duty_func(property_price)
+    total_cash_needed = deposit_required + fees_total + stamp_duty
+    monthly_annual_costs = sum(annual_costs.values()) / 12
+    ftv_pct = (max_loan / property_price * 100) if property_price > 0 else 0.0
+
+    result = {
+        "scenario": scenario_name,
+        "property_price": round(property_price, 2),
+        "annual_rate": round(annual_rate, 4),
+        "term_years": term_years,
+        "target_mortgage_payment": round(target_mortgage_payment, 2),
+        "max_loan_supported": round(max_loan, 2),
+        "deposit_required": round(deposit_required, 2),
+        "fees_total": round(fees_total, 2),
+        "stamp_duty": round(stamp_duty, 2),
+        "total_cash_needed": round(total_cash_needed, 2),
+        "monthly_annual_costs_separate": round(monthly_annual_costs, 2),
+        "ftv_pct": round(ftv_pct, 2),
+    }
+    for k, v in fees.items():
+        result[f"fee__{k}"] = round(v, 2)
+    return result
+
+
+def build_required_cash_df(target_payment: float, scenarios: dict, fees: dict, annual_costs: dict, stamp_func) -> pd.DataFrame:
+    rows = []
+    for scenario_name, cfg in scenarios.items():
+        rows.append(
+            required_cash_for_target_mortgage_payment(
+                scenario_name=scenario_name,
+                property_price=cfg["property_price"],
+                annual_rate=cfg["annual_rate"],
+                term_years=cfg["term_years"],
+                target_mortgage_payment=target_payment,
+                fees=fees,
+                annual_costs=annual_costs,
+                stamp_duty_func=stamp_func,
+            )
+        )
+    df = pd.DataFrame(rows)
+    order = ["25Y", "35Y", "40Y"]
+    df["scenario"] = pd.Categorical(df["scenario"], categories=order, ordered=True)
+    return df.sort_values("scenario").reset_index(drop=True)
+
+
+def build_scenario_objects_from_required_cash(required_cash_df: pd.DataFrame, fees: dict, annual_costs: dict, stamp_duty_func) -> dict:
+    scenario_objects = {}
+    for _, row in required_cash_df.iterrows():
+        scenario_objects[row["scenario"]] = Scenario(
+            row["scenario"],
+            float(row["property_price"]),
+            float(row["deposit_required"]),
+            float(row["annual_rate"]),
+            int(row["term_years"]),
+            fees,
+            annual_costs,
+            stamp_duty_func,
+        )
+    return scenario_objects
+
+
 def amort_table(scenario: Scenario) -> pd.DataFrame:
     principal = scenario.property_price - scenario.deposit
     r = scenario.annual_rate / 100 / 12
@@ -172,7 +275,6 @@ def amort_table(scenario: Scenario) -> pd.DataFrame:
 
     rows = []
     balance = principal
-
     for month_num in range(1, n + 1):
         opening_balance = balance
         interest = opening_balance * r
@@ -203,7 +305,6 @@ def amort_table(scenario: Scenario) -> pd.DataFrame:
 
         if balance <= 1e-8:
             break
-
     return pd.DataFrame(rows)
 
 
@@ -214,111 +315,36 @@ def yearly_from_monthly(df: pd.DataFrame) -> pd.DataFrame:
             "interest": "sum",
             "principal": "sum",
             "payment": "sum",
-            "balance": "last"
+            "balance": "last",
         })
     )
 
 
-def build_scenario_objects(scenarios_dict: dict, fees: dict, annual_costs: dict, stamp_duty_func):
-    scenario_objects = {}
-    for key, cfg in scenarios_dict.items():
-        scenario_objects[key] = Scenario(
-            key,
-            cfg["property_price"],
-            cfg["deposit"],
-            cfg["annual_rate"],
-            cfg["term_years"],
-            fees,
-            annual_costs,
-            stamp_duty_func,
-        )
-    return scenario_objects
-
-
-def max_loan_from_target_mortgage_payment(target_mortgage_payment: float, annual_rate: float, term_years: int) -> float:
-    r = annual_rate / 100 / 12
-    n = term_years * 12
-    if r == 0:
-        return target_mortgage_payment * n
-    return target_mortgage_payment * ((1 + r) ** n - 1) / (r * (1 + r) ** n)
-
-
-def required_cash_for_target_mortgage_payment(
-    scenario_name: str,
-    property_price: float,
-    annual_rate: float,
-    term_years: int,
-    target_mortgage_payment: float,
-    fees: dict,
-    annual_costs: dict,
-    stamp_duty_func,
-) -> dict:
-    max_loan = max_loan_from_target_mortgage_payment(target_mortgage_payment, annual_rate, term_years)
-    deposit_required = max(property_price - max_loan, 0.0)
-    fees_total = sum(fees.values())
-    stamp_duty = stamp_duty_func(property_price)
-    monthly_annual_costs = sum(annual_costs.values()) / 12
-    total_cash_needed = deposit_required + fees_total + stamp_duty
-
-    result = {
-        "scenario": scenario_name,
-        "property_price": round(property_price, 2),
-        "annual_rate": round(annual_rate, 4),
-        "term_years": term_years,
-        "target_mortgage_payment": round(target_mortgage_payment, 2),
-        "max_loan_supported": round(max_loan, 2),
-        "deposit_required": round(deposit_required, 2),
-        "fees_total": round(fees_total, 2),
-        "stamp_duty": round(stamp_duty, 2),
-        "total_cash_needed": round(total_cash_needed, 2),
-        "monthly_annual_costs_separate": round(monthly_annual_costs, 2),
-    }
-    for k, v in fees.items():
-        result[f"fee__{k}"] = round(v, 2)
-    return result
-
-
-def build_required_cash_df(target_payment: float, scenarios: dict, fees: dict, annual_costs: dict, stamp_func) -> pd.DataFrame:
-    rows = []
-    for scenario_name, cfg in scenarios.items():
-        rows.append(
-            required_cash_for_target_mortgage_payment(
-                scenario_name=scenario_name,
-                property_price=cfg["property_price"],
-                annual_rate=cfg["annual_rate"],
-                term_years=cfg["term_years"],
-                target_mortgage_payment=target_payment,
-                fees=fees,
-                annual_costs=annual_costs,
-                stamp_duty_func=stamp_func,
-            )
-        )
-    return pd.DataFrame(rows)
-
+# =========================
+# CHARTS
+# =========================
 
 def build_required_cash_chart(df_required_cash: pd.DataFrame) -> go.Figure:
     stack_parts = {
-        "deposit_required": "Deposit Required",
+        "deposit_required": "Deposit",
         "stamp_duty": "Stamp Duty",
         "fee__Solicitor Fees": "Solicitor Fees",
         "fee__Surveyor": "Surveyor",
         "fee__Land Registry Fee": "Land Registry Fee",
         "fee__Valuation Fee": "Valuation Fee",
-        "fee__Admin/Arrangement Fee": "Admin/Arrangement Fee",
+        "fee__Admin/Arrangement Fee": "Admin / Arrangement Fee",
         "fee__Legal Contribution Fee": "Legal Contribution Fee",
         "fee__Buildings Insurance (Upfront)": "Buildings Insurance (Upfront)",
     }
 
     fig = go.Figure()
     for col, label in stack_parts.items():
-        fig.add_trace(
-            go.Bar(
-                x=df_required_cash["scenario"],
-                y=df_required_cash[col],
-                name=label,
-                hovertemplate="Scenario: %{x}<br>" + label + ": £%{y:,.0f}<extra></extra>",
-            )
-        )
+        fig.add_trace(go.Bar(
+            x=df_required_cash["scenario"],
+            y=df_required_cash[col],
+            name=label,
+            hovertemplate="Scenario: %{x}<br>" + label + ": £%{y:,.0f}<extra></extra>",
+        ))
 
     fig.update_layout(
         title=f"Cash Required for £{df_required_cash['target_mortgage_payment'].iloc[0]:,.0f}/mo Mortgage",
@@ -326,9 +352,9 @@ def build_required_cash_chart(df_required_cash: pd.DataFrame) -> go.Figure:
         template="plotly_white",
         xaxis_title="Scenario",
         yaxis_title="Cash Required (£)",
-        height=440,
-        legend=dict(orientation="h", y=-0.26, x=0, font=dict(size=10)),
-        margin=dict(t=60, l=10, r=10, b=110),
+        height=500,
+        legend=dict(orientation="h", y=-0.28, x=0, font=dict(size=10)),
+        margin=dict(t=60, l=10, r=10, b=120),
     )
 
     for _, row in df_required_cash.iterrows():
@@ -339,7 +365,6 @@ def build_required_cash_chart(df_required_cash: pd.DataFrame) -> go.Figure:
             showarrow=False,
             yshift=12,
         )
-
     return fig
 
 
@@ -408,77 +433,96 @@ def build_amortisation_drilldown_chart(df_monthly: pd.DataFrame, scenario_title:
         template="plotly_white",
         barmode="group",
         updatemenus=[dict(buttons=buttons, direction="down", x=0, xanchor="left", y=1.12, yanchor="top")],
-        xaxis=dict(title="Year", tickangle=0),
+        xaxis=dict(title="Year"),
         yaxis=dict(title="Principal / Interest (£)"),
         yaxis2=dict(title="Balance (£)", overlaying="y", side="right", showgrid=False),
         legend=dict(orientation="h", y=-0.24, x=0, font=dict(size=10)),
-        height=440,
+        height=460,
         margin=dict(t=95, l=10, r=10, b=105),
     )
     return fig
 
 
-def build_5yr_comparison(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
-    y1 = yearly_from_monthly(df1).copy()
-    y2 = yearly_from_monthly(df2).copy()
+def build_5yr_comparison_against_base(df_base: pd.DataFrame, df_compare: pd.DataFrame, compare_label: str) -> pd.DataFrame:
+    y_base = yearly_from_monthly(df_base).copy()
+    y_cmp = yearly_from_monthly(df_compare).copy()
     years = pd.DataFrame({"year": range(1, 26)})
-    y1 = years.merge(y1, on="year", how="left").fillna(0)
-    y2 = years.merge(y2, on="year", how="left").fillna(0)
+    y_base = years.merge(y_base, on="year", how="left").fillna(0)
+    y_cmp = years.merge(y_cmp, on="year", how="left").fillna(0)
 
     rows = []
     for start_year in [1, 6, 11, 16, 21]:
         end_year = start_year + 4
-        sub1 = y1[(y1["year"] >= start_year) & (y1["year"] <= end_year)]
-        sub2 = y2[(y2["year"] >= start_year) & (y2["year"] <= end_year)]
-        extra_interest_35_vs_25 = sub2["interest"].sum() - sub1["interest"].sum()
-        extra_principal_25_vs_35 = sub1["principal"].sum() - sub2["principal"].sum()
+        sub_base = y_base[(y_base["year"] >= start_year) & (y_base["year"] <= end_year)]
+        sub_cmp = y_cmp[(y_cmp["year"] >= start_year) & (y_cmp["year"] <= end_year)]
+        extra_interest = sub_cmp["interest"].sum() - sub_base["interest"].sum()
+        extra_principal = sub_base["principal"].sum() - sub_cmp["principal"].sum()
         rows.append({
+            "comparison": compare_label,
             "period": f"Years {start_year}-{end_year}",
-            "total_extra_interest_35_vs_25": extra_interest_35_vs_25,
-            "total_extra_principal_25_vs_35": extra_principal_25_vs_35,
-            "avg_extra_interest_per_month": extra_interest_35_vs_25 / 60,
-            "avg_extra_principal_per_month": extra_principal_25_vs_35 / 60,
+            "total_extra_interest": extra_interest,
+            "total_extra_principal": extra_principal,
+            "avg_extra_interest_per_month": extra_interest / 60,
+            "avg_extra_principal_per_month": extra_principal / 60,
         })
     return pd.DataFrame(rows)
 
 
-def build_5yr_chart(compare_5yr: pd.DataFrame) -> go.Figure:
+def build_strategy_chart(compare_df: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=compare_5yr["period"],
-        y=compare_5yr["total_extra_interest_35_vs_25"],
-        name="Total Extra Interest (35Y vs 25Y)",
-        visible=True,
-        hovertemplate="%{x}<br>Total extra interest: £%{y:,.2f}<extra></extra>"
-    ))
-    fig.add_trace(go.Bar(
-        x=compare_5yr["period"],
-        y=compare_5yr["total_extra_principal_25_vs_35"],
-        name="Total Extra Principal (25Y vs 35Y)",
-        visible=True,
-        hovertemplate="%{x}<br>Total extra principal: £%{y:,.2f}<extra></extra>"
-    ))
-    fig.add_trace(go.Bar(
-        x=compare_5yr["period"],
-        y=compare_5yr["avg_extra_interest_per_month"],
-        name="Avg Extra Interest / Month",
-        visible=False,
-        hovertemplate="%{x}<br>Avg extra interest / month: £%{y:,.2f}<extra></extra>"
-    ))
-    fig.add_trace(go.Bar(
-        x=compare_5yr["period"],
-        y=compare_5yr["avg_extra_principal_per_month"],
-        name="Avg Extra Principal / Month",
-        visible=False,
-        hovertemplate="%{x}<br>Avg extra principal / month: £%{y:,.2f}<extra></extra>"
-    ))
+    comparisons = compare_df["comparison"].unique().tolist()
 
+    # totals view
+    for comp in comparisons:
+        sub = compare_df[compare_df["comparison"] == comp]
+        fig.add_trace(go.Bar(
+            x=sub["period"],
+            y=sub["total_extra_interest"],
+            name=f"{comp} · Extra Interest",
+            visible=True,
+            text=[f"£{v:,.0f}" for v in sub["total_extra_interest"]],
+            textposition="outside",
+            hovertemplate="%{x}<br>" + comp + " extra interest: £%{y:,.2f}<extra></extra>",
+        ))
+        fig.add_trace(go.Bar(
+            x=sub["period"],
+            y=sub["total_extra_principal"],
+            name=f"{comp} · Extra Principal",
+            visible=True,
+            text=[f"£{v:,.0f}" for v in sub["total_extra_principal"]],
+            textposition="outside",
+            hovertemplate="%{x}<br>" + comp + " extra principal: £%{y:,.2f}<extra></extra>",
+        ))
+
+    # monthly averages view
+    for comp in comparisons:
+        sub = compare_df[compare_df["comparison"] == comp]
+        fig.add_trace(go.Bar(
+            x=sub["period"],
+            y=sub["avg_extra_interest_per_month"],
+            name=f"{comp} · Avg Interest / Month",
+            visible=False,
+            text=[f"£{v:,.0f}" for v in sub["avg_extra_interest_per_month"]],
+            textposition="outside",
+            hovertemplate="%{x}<br>" + comp + " avg interest / month: £%{y:,.2f}<extra></extra>",
+        ))
+        fig.add_trace(go.Bar(
+            x=sub["period"],
+            y=sub["avg_extra_principal_per_month"],
+            name=f"{comp} · Avg Principal / Month",
+            visible=False,
+            text=[f"£{v:,.0f}" for v in sub["avg_extra_principal_per_month"]],
+            textposition="outside",
+            hovertemplate="%{x}<br>" + comp + " avg principal / month: £%{y:,.2f}<extra></extra>",
+        ))
+
+    n = len(comparisons) * 2
     buttons = [
         dict(
             label="Totals by 5-Year Period",
             method="update",
             args=[
-                {"visible": [True, True, False, False]},
+                {"visible": [True] * n + [False] * n},
                 {"title": "5-Year Totals · Extra Interest and Extra Principal", "yaxis.title": "£ Total over 5-Year Period", "barmode": "group"}
             ]
         ),
@@ -486,37 +530,39 @@ def build_5yr_chart(compare_5yr: pd.DataFrame) -> go.Figure:
             label="Monthly Averages by 5-Year Period",
             method="update",
             args=[
-                {"visible": [False, False, True, True]},
+                {"visible": [False] * n + [True] * n},
                 {"title": "5-Year Monthly Averages · Extra Interest and Extra Principal", "yaxis.title": "£ per Month", "barmode": "group"}
             ]
-        )
+        ),
     ]
 
     fig.update_layout(
         title="5-Year Totals · Extra Interest and Extra Principal",
         template="plotly_white",
         barmode="group",
-        updatemenus=[dict(buttons=buttons, direction="down", x=0, xanchor="left", y=1.12, yanchor="top")],
+        updatemenus=[dict(buttons=buttons, direction="down", x=0, xanchor="left", y=1.14, yanchor="top")],
         xaxis_title="5-Year Interval",
         yaxis_title="£ Total over 5-Year Period",
-        height=430,
-        legend=dict(orientation="h", y=-0.24, x=0, font=dict(size=10)),
-        margin=dict(t=95, l=10, r=10, b=105),
+        height=500,
+        legend=dict(orientation="h", y=-0.3, x=0, font=dict(size=10)),
+        margin=dict(t=95, l=10, r=10, b=120),
     )
     return fig
 
 
 # =========================
-# STREAMLIT UI
+# UI
 # =========================
 
 st.title("Welcome to Mortgage Roulette")
-st.markdown('<div class="subtle">A mortgage comparison workspace for testing payment targets, upfront cash requirements, and amortisation trade-offs.</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="subtle">A mortgage comparison workspace for testing payment targets, upfront cash requirements, and amortisation trade-offs.</div>',
+    unsafe_allow_html=True,
+)
 
 with st.sidebar:
     st.header("Inputs")
     property_price = st.number_input("Property price (£)", min_value=0, value=0, step=5000, placeholder="Enter property price")
-    deposit = st.number_input("Deposit (£)", min_value=0, value=150000, step=5000)
     annual_rate = st.number_input("Annual rate (%)", min_value=0.0, value=6.15, step=0.05)
     target_payment = st.number_input("Target monthly mortgage payment (£)", min_value=0, value=1500, step=25)
 
@@ -550,66 +596,80 @@ fees = {
 annual_costs = {"Buildings Insurance (Annual)": float(insurance_annual)}
 stamp_func = england_stamp_duty_ftb if stamp_mode == "First-time buyer" else england_stamp_duty_standard
 
-scenarios = {
-    "25Y": {"label": "25-Year Scenario", "property_price": float(property_price), "deposit": float(deposit), "annual_rate": float(annual_rate), "term_years": 25},
-    "35Y": {"label": "35-Year Scenario", "property_price": float(property_price), "deposit": float(deposit), "annual_rate": float(annual_rate), "term_years": 35},
+base_scenarios = {
+    "25Y": {"label": "25-Year Scenario", "property_price": float(property_price), "annual_rate": float(annual_rate), "term_years": 25},
+    "35Y": {"label": "35-Year Scenario", "property_price": float(property_price), "annual_rate": float(annual_rate), "term_years": 35},
+    "40Y": {"label": "40-Year Scenario", "property_price": float(property_price), "annual_rate": float(annual_rate), "term_years": 40},
 }
 
-# Build data
-required_cash_df = build_required_cash_df(target_payment, scenarios, fees, annual_costs, stamp_func)
-scenario_objects = build_scenario_objects(scenarios, fees, annual_costs, stamp_func)
-df1 = amort_table(scenario_objects["25Y"])
-df2 = amort_table(scenario_objects["35Y"])
-compare_5yr = build_5yr_comparison(df1, df2)
+required_cash_df = build_required_cash_df(target_payment, base_scenarios, fees, annual_costs, stamp_func)
+scenario_objects = build_scenario_objects_from_required_cash(required_cash_df, fees, annual_costs, stamp_func)
 
-# Header metrics
-c1, c2, c3, c4 = st.columns(4)
-with c1:
-    st.metric("Property price", f"£{property_price:,.0f}")
-with c2:
-    st.metric("Deposit", f"£{deposit:,.0f}")
-with c3:
+# build amortisation data
+amort_tables = {k: amort_table(v) for k, v in scenario_objects.items()}
+compare_35_vs_25 = build_5yr_comparison_against_base(amort_tables["25Y"], amort_tables["35Y"], "35Y vs 25Y")
+compare_40_vs_25 = build_5yr_comparison_against_base(amort_tables["25Y"], amort_tables["40Y"], "40Y vs 25Y")
+compare_5yr = pd.concat([compare_35_vs_25, compare_40_vs_25], ignore_index=True)
+
+# top metrics row
+m1, m2, m3, m4 = st.columns(4)
+with m1:
+    st.metric("Property price", fmt_gbp(property_price))
+with m2:
     st.metric("Annual rate", f"{annual_rate:.2f}%")
-with c4:
+with m3:
     st.metric("Target mortgage", f"£{target_payment:,.0f}/mo")
+with m4:
+    st.metric("Stamp duty mode", "FTB" if stamp_mode == "First-time buyer" else "Standard")
+
+st.markdown("<div style='height:0.35rem'></div>", unsafe_allow_html=True)
+summary_cols = st.columns(3)
+for col, (_, row) in zip(summary_cols, required_cash_df.iterrows()):
+    with col:
+        st.markdown(
+            f"""
+            <div class="scenario-summary">
+                <h4>{row['scenario']}</h4>
+                <div class="scenario-kv">
+                    <div>Cash Required</div><div>{fmt_gbp(row['total_cash_needed'])}</div>
+                    <div>Deposit</div><div>{fmt_gbp(row['deposit_required'])}</div>
+                    <div>Fees</div><div>{fmt_gbp(row['fees_total'])}</div>
+                    <div>Stamp Duty</div><div>{fmt_gbp(row['stamp_duty'])}</div>
+                    <div>FTV %</div><div>{row['ftv_pct']:.1f}%</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 cash_tab, amort_tab, strategy_tab = st.tabs(["Cash Required", "Amortisation", "5-Year Strategy"])
 
 with cash_tab:
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.subheader("Required cash to hit target payment")
-    st.markdown('<div class="subtle">For the selected property price and mortgage target, this shows the upfront cash mix needed across the 25-year and 35-year structures.</div>', unsafe_allow_html=True)
-    render_chart_with_actions(build_required_cash_chart(required_cash_df), 'cash_required', 'Cash Required')
-    with st.expander('Show cash summary table'):
-        st.dataframe(required_cash_df, use_container_width=True, height=260)
+    st.markdown('<div class="subtle">For the selected property price and mortgage target, this shows the upfront cash mix needed across the 25-year, 35-year and 40-year structures.</div>', unsafe_allow_html=True)
+    render_chart_with_actions(build_required_cash_chart(required_cash_df), "cash_required", "Cash Required")
+    with st.expander("Show cash summary table"):
+        st.dataframe(required_cash_df, use_container_width=True, height=300)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with amort_tab:
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.subheader("25-year amortisation")
-    st.markdown('<div class="subtle">Use the chart menu to switch between yearly overview and monthly drilldown. PNG download, HTML download, and chart JSON copy are available below.</div>', unsafe_allow_html=True)
-    render_chart_with_actions(
-        build_amortisation_drilldown_chart(df1, scenarios["25Y"]["label"]),
-        'amort_25',
-        '25-Year Amortisation'
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.subheader("35-year amortisation")
-    st.markdown('<div class="subtle">Use the chart menu to switch between yearly overview and monthly drilldown. PNG download, HTML download, and chart JSON copy are available below.</div>', unsafe_allow_html=True)
-    render_chart_with_actions(
-        build_amortisation_drilldown_chart(df2, scenarios["35Y"]["label"]),
-        'amort_35',
-        '35-Year Amortisation'
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
+    for key in ["25Y", "35Y", "40Y"]:
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.subheader(base_scenarios[key]["label"].replace("Scenario", "amortisation"))
+        st.markdown('<div class="subtle">Use the chart menu to switch between yearly overview and monthly drilldown. PNG download, HTML download, and chart JSON copy are available below.</div>', unsafe_allow_html=True)
+        render_chart_with_actions(
+            build_amortisation_drilldown_chart(amort_tables[key], base_scenarios[key]["label"]),
+            f"amort_{key.lower()}",
+            f"{key} Amortisation",
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
 
 with strategy_tab:
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.subheader("5-year interval comparison")
-    st.markdown('<div class="subtle">Toggle between total impact by 5-year block and the monthly average cost of delaying debt.</div>', unsafe_allow_html=True)
-    render_chart_with_actions(build_5yr_chart(compare_5yr), 'strategy_5yr', '5-Year Strategy')
-    with st.expander('Show 5-year comparison table'):
-        st.dataframe(compare_5yr.round(2), use_container_width=True, height=240)
+    st.markdown('<div class="subtle">Toggle between total impact by 5-year block and the monthly average cost of delaying debt. Labels on each bar show the cash amount directly.</div>', unsafe_allow_html=True)
+    render_chart_with_actions(build_strategy_chart(compare_5yr), "strategy_5yr", "5-Year Strategy")
+    with st.expander("Show 5-year comparison table"):
+        st.dataframe(compare_5yr.round(2), use_container_width=True, height=300)
     st.markdown('</div>', unsafe_allow_html=True)
