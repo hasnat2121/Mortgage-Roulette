@@ -12,11 +12,16 @@ st.set_page_config(page_title="Mortgage Roulette", layout="wide", initial_sideba
 
 st.markdown(
     """
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
     <style>
     .block-container {
         padding-top: 1.2rem;
         padding-bottom: 1.4rem;
         max-width: 1280px;
+    }
+    html, body, [data-testid="stAppViewContainer"], .main {
+        overflow-x: hidden;
+        width: 100%;
     }
     h1, h2, h3 { letter-spacing: -0.02em; }
     .subtle {
@@ -66,6 +71,32 @@ st.markdown(
             border-radius: 10px;
         }
     }
+
+    @media (max-width: 768px) {
+        .block-container {
+            padding-top: 0.8rem !important;
+            padding-bottom: 1rem !important;
+            padding-left: 0.7rem !important;
+            padding-right: 0.7rem !important;
+            max-width: 100% !important;
+        }
+        h1 { font-size: 1.6rem !important; line-height: 1.15 !important; }
+        h2 { font-size: 1.2rem !important; line-height: 1.2 !important; }
+        h3 { font-size: 1.05rem !important; line-height: 1.2 !important; }
+        button, input, select, textarea, [data-baseweb="select"] {
+            font-size: 16px !important;
+        }
+        .section-card, .scenario-summary {
+            padding: 0.75rem 0.8rem !important;
+            border-radius: 10px !important;
+        }
+        .subtle {
+            font-size: 0.9rem !important;
+        }
+        [data-testid="stHorizontalBlock"] {
+            gap: 0.5rem !important;
+        }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -77,6 +108,11 @@ st.markdown(
 # =========================
 
 def render_chart_with_actions(fig: go.Figure, chart_key: str, title: str):
+    fig.update_layout(
+        autosize=True,
+        margin=dict(l=10, r=10, t=40, b=40),
+        legend=dict(orientation="h", y=-0.2, x=0, xanchor="left"),
+    )
     chart_json = fig.to_json()
     chart_html = pio.to_html(fig, full_html=True, include_plotlyjs="cdn")
 
