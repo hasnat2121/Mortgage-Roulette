@@ -122,6 +122,9 @@ def render_chart_with_actions(fig: go.Figure, chart_key: str, title: str):
 def fmt_gbp(x: float) -> str:
     return f"£{x:,.0f}"
 
+# Fixed deposit assumption used for like-for-like amortisation and strategy comparisons
+BASE_COMPARISON_DEPOSIT = 150000.0
+
 
 # =========================
 # STAMP DUTY
@@ -603,10 +606,24 @@ base_scenarios = {
 }
 
 required_cash_df = build_required_cash_df(target_payment, base_scenarios, fees, annual_costs, stamp_func)
-scenario_objects = build_scenario_objects_from_required_cash(required_cash_df, fees, annual_costs, stamp_func)
 
-# build amortisation data
-amort_tables = {k: amort_table(v) for k, v in scenario_objects.items()}
+# Fixed-deposit scenarios for like-for-like amortisation and strategy comparisons
+comparison_scenarios = {
+    key: Scenario(
+        key,
+        float(cfg["property_price"]),
+        float(BASE_COMPARISON_DEPOSIT),
+        float(cfg["annual_rate"]),
+        int(cfg["term_years"]),
+        fees,
+        annual_costs,
+        stamp_func,
+    )
+    for key, cfg in base_scenarios.items()
+}
+
+# build amortisation data on the same deposit basis across terms
+amort_tables = {k: amort_table(v) for k, v in comparison_scenarios.items()}
 compare_35_vs_25 = build_5yr_comparison_against_base(amort_tables["25Y"], amort_tables["35Y"], "35Y vs 25Y")
 compare_40_vs_25 = build_5yr_comparison_against_base(amort_tables["25Y"], amort_tables["40Y"], "40Y vs 25Y")
 compare_against_25 = pd.concat([compare_35_vs_25, compare_40_vs_25], ignore_index=True)
@@ -659,7 +676,7 @@ with amort_tab:
     for key in ["25Y", "35Y", "40Y"]:
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.subheader(base_scenarios[key]["label"].replace("Scenario", "amortisation"))
-        st.markdown('<div class="subtle">Use the chart menu to switch between yearly overview and monthly drilldown. PNG download, HTML download, and chart JSON copy are available below.</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="subtle">Use the chart menu to switch between yearly overview and monthly drilldown. Charts use a fixed like-for-like comparison deposit of {fmt_gbp(BASE_COMPARISON_DEPOSIT)}. PNG download, HTML download, and chart JSON copy are available below.</div>', unsafe_allow_html=True)
         render_chart_with_actions(
             build_amortisation_drilldown_chart(amort_tables[key], base_scenarios[key]["label"]),
             f"amort_{key.lower()}",
@@ -670,7 +687,7 @@ with amort_tab:
 with strategy_tab:
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.subheader("5-year interval comparison · anchored to 25-year")
-    st.markdown('<div class="subtle">This compares 35Y vs 25Y and 40Y vs 25Y. Extra interest means the longer plan paid more interest; extra principal means the 25Y plan paid down more principal over the same 5-year block. Use the menu to switch between totals and monthly averages.</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="subtle">This compares 35Y vs 25Y and 40Y vs 25Y using a fixed comparison deposit of {fmt_gbp(BASE_COMPARISON_DEPOSIT)}. Extra interest means the longer plan paid more interest; extra principal means the shorter plan paid down more principal over the same 5-year block. Use the menu to switch between totals and monthly averages.</div>', unsafe_allow_html=True)
     render_chart_with_actions(
         build_strategy_chart(compare_against_25, "Anchored to 25-Year"),
         "strategy_5yr_anchor_25",
@@ -682,7 +699,7 @@ with strategy_tab:
 
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.subheader("5-year interval comparison · anchored to 35-year")
-    st.markdown('<div class="subtle">This compares 40Y vs 35Y. Extra interest means the 40Y plan paid more interest; extra principal means the 35Y plan paid down more principal over the same 5-year block. Use the menu to switch between totals and monthly averages.</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="subtle">This compares 40Y vs 35Y using a fixed comparison deposit of {fmt_gbp(BASE_COMPARISON_DEPOSIT)}. Extra interest means the 40Y plan paid more interest; extra principal means the 35Y plan paid down more principal over the same 5-year block. Use the menu to switch between totals and monthly averages.</div>', unsafe_allow_html=True)
     render_chart_with_actions(
         build_strategy_chart(compare_40_vs_35, "Anchored to 35-Year"),
         "strategy_5yr_anchor_35",
