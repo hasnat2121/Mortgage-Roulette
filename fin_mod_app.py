@@ -471,6 +471,80 @@ def build_5yr_comparison_against_base(df_base: pd.DataFrame, df_compare: pd.Data
     return pd.DataFrame(rows)
 
 
+def build_strategy_simple_chart(compare_df: pd.DataFrame, title_prefix: str) -> go.Figure:
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        x=compare_df["period"],
+        y=compare_df["total_extra_interest"],
+        name="Extra Interest",
+        visible=True,
+        text=[f"£{v:,.0f}" for v in compare_df["total_extra_interest"]],
+        textposition="outside",
+        hovertemplate="%{x}<br>Extra interest: £%{y:,.2f}<extra></extra>",
+    ))
+    fig.add_trace(go.Bar(
+        x=compare_df["period"],
+        y=compare_df["total_extra_principal"],
+        name="Extra Principal",
+        visible=True,
+        text=[f"£{v:,.0f}" for v in compare_df["total_extra_principal"]],
+        textposition="outside",
+        hovertemplate="%{x}<br>Extra principal: £%{y:,.2f}<extra></extra>",
+    ))
+
+    fig.add_trace(go.Bar(
+        x=compare_df["period"],
+        y=compare_df["avg_extra_interest_per_month"],
+        name="Avg Interest / Month",
+        visible=False,
+        text=[f"£{v:,.0f}" for v in compare_df["avg_extra_interest_per_month"]],
+        textposition="outside",
+        hovertemplate="%{x}<br>Avg interest / month: £%{y:,.2f}<extra></extra>",
+    ))
+    fig.add_trace(go.Bar(
+        x=compare_df["period"],
+        y=compare_df["avg_extra_principal_per_month"],
+        name="Avg Principal / Month",
+        visible=False,
+        text=[f"£{v:,.0f}" for v in compare_df["avg_extra_principal_per_month"]],
+        textposition="outside",
+        hovertemplate="%{x}<br>Avg principal / month: £%{y:,.2f}<extra></extra>",
+    ))
+
+    buttons = [
+        dict(
+            label="Totals by 5-Year Period",
+            method="update",
+            args=[
+                {"visible": [True, True, False, False]},
+                {"title": f"{title_prefix} · Totals by 5-Year Period", "yaxis.title": "£ Total over 5-Year Period", "barmode": "group"}
+            ]
+        ),
+        dict(
+            label="Monthly Averages by 5-Year Period",
+            method="update",
+            args=[
+                {"visible": [False, False, True, True]},
+                {"title": f"{title_prefix} · Monthly Averages by 5-Year Period", "yaxis.title": "£ per Month", "barmode": "group"}
+            ]
+        ),
+    ]
+
+    fig.update_layout(
+        title=f"{title_prefix} · Totals by 5-Year Period",
+        template="plotly_white",
+        barmode="group",
+        updatemenus=[dict(buttons=buttons, direction="down", x=0, xanchor="left", y=1.14, yanchor="top")],
+        xaxis_title="5-Year Interval",
+        yaxis_title="£ Total over 5-Year Period",
+        height=460,
+        legend=dict(orientation="h", y=-0.28, x=0, font=dict(size=10)),
+        margin=dict(t=95, l=10, r=10, b=120),
+    )
+    return fig
+
+
 def build_strategy_chart(compare_df: pd.DataFrame, title_prefix: str) -> go.Figure:
     fig = go.Figure()
     comparisons = compare_df["comparison"].unique().tolist()
@@ -685,6 +759,16 @@ with amort_tab:
         st.markdown('</div>', unsafe_allow_html=True)
 
 with strategy_tab:
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.subheader("5-year interval comparison · quick view · 25-year vs 35-year")
+    st.markdown(f'<div class="subtle">A simpler view for users who want the headline comparison only. This shows 35Y vs 25Y using a fixed comparison deposit of {fmt_gbp(BASE_COMPARISON_DEPOSIT)}.</div>', unsafe_allow_html=True)
+    render_chart_with_actions(
+        build_strategy_simple_chart(compare_35_vs_25, "25-Year vs 35-Year"),
+        "strategy_5yr_simple_25_35",
+        "5-Year Strategy · 25-Year vs 35-Year",
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.subheader("5-year interval comparison · anchored to 25-year")
     st.markdown(f'<div class="subtle">This compares 35Y vs 25Y and 40Y vs 25Y using a fixed comparison deposit of {fmt_gbp(BASE_COMPARISON_DEPOSIT)}. Extra interest means the longer plan paid more interest; extra principal means the shorter plan paid down more principal over the same 5-year block. Use the menu to switch between totals and monthly averages.</div>', unsafe_allow_html=True)
