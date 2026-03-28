@@ -446,7 +446,7 @@ def build_amortisation_drilldown_chart(df_monthly: pd.DataFrame, scenario_title:
     buttons = []
     yearly_visible = [True, True, True] + [False] * (total_traces - 3)
     buttons.append(dict(
-        label="Yearly Overview",
+        label="Overview",
         method="update",
         args=[
             {"visible": yearly_visible},
@@ -459,7 +459,7 @@ def build_amortisation_drilldown_chart(df_monthly: pd.DataFrame, scenario_title:
         start = 3 + i * 3
         visible[start:start+3] = [True, True, True]
         buttons.append(dict(
-            label=f"Monthly: Year {yr}",
+            label=f"Year {yr}",
             method="update",
             args=[
                 {"visible": visible},
@@ -471,13 +471,13 @@ def build_amortisation_drilldown_chart(df_monthly: pd.DataFrame, scenario_title:
         title=f"{scenario_title} · Principal, Interest and Balance",
         template="plotly_white",
         barmode="group",
-        updatemenus=[dict(buttons=buttons, direction="down", x=0, xanchor="left", y=1.12, yanchor="top")],
+        updatemenus=[dict(buttons=buttons, direction="down", x=0.0, xanchor="left", y=0.985, yanchor="top", font=dict(size=9), pad=dict(t=0, r=0, b=0, l=0), bgcolor="rgba(255,255,255,0.96)", bordercolor="rgba(49,51,63,0.15)", borderwidth=1)],
         xaxis=dict(title="Year"),
         yaxis=dict(title="Principal / Interest (£)"),
         yaxis2=dict(title="Balance (£)", overlaying="y", side="right", showgrid=False),
         legend=dict(orientation="h", y=-0.24, x=0, font=dict(size=10)),
         height=460,
-        margin=dict(t=95, l=10, r=10, b=105),
+        margin=dict(t=130, l=10, r=10, b=105),
     )
     return fig
 
@@ -550,7 +550,7 @@ def build_strategy_simple_chart(compare_df: pd.DataFrame, title_prefix: str) -> 
 
     buttons = [
         dict(
-            label="Totals by 5-Year Period",
+            label="Totals",
             method="update",
             args=[
                 {"visible": [True, True, False, False]},
@@ -558,7 +558,7 @@ def build_strategy_simple_chart(compare_df: pd.DataFrame, title_prefix: str) -> 
             ]
         ),
         dict(
-            label="Monthly Averages by 5-Year Period",
+            label="Monthly Avg",
             method="update",
             args=[
                 {"visible": [False, False, True, True]},
@@ -571,12 +571,12 @@ def build_strategy_simple_chart(compare_df: pd.DataFrame, title_prefix: str) -> 
         title=f"{title_prefix} · Totals by 5-Year Period",
         template="plotly_white",
         barmode="group",
-        updatemenus=[dict(buttons=buttons, direction="down", x=0, xanchor="left", y=1.14, yanchor="top")],
+        updatemenus=[dict(buttons=buttons, direction="down", x=0.0, xanchor="left", y=0.985, yanchor="top", font=dict(size=9), pad=dict(t=0, r=0, b=0, l=0), bgcolor="rgba(255,255,255,0.96)", bordercolor="rgba(49,51,63,0.15)", borderwidth=1)],
         xaxis_title="5-Year Interval",
         yaxis_title="£ Total over 5-Year Period",
         height=460,
         legend=dict(orientation="h", y=-0.28, x=0, font=dict(size=10)),
-        margin=dict(t=95, l=10, r=10, b=120),
+        margin=dict(t=130, l=10, r=10, b=120),
     )
     return fig
 
@@ -632,7 +632,7 @@ def build_strategy_chart(compare_df: pd.DataFrame, title_prefix: str) -> go.Figu
     n = len(comparisons) * 2
     buttons = [
         dict(
-            label="Totals by 5-Year Period",
+            label="Totals",
             method="update",
             args=[
                 {"visible": [True] * n + [False] * n},
@@ -640,7 +640,7 @@ def build_strategy_chart(compare_df: pd.DataFrame, title_prefix: str) -> go.Figu
             ]
         ),
         dict(
-            label="Monthly Averages by 5-Year Period",
+            label="Monthly Avg",
             method="update",
             args=[
                 {"visible": [False] * n + [True] * n},
@@ -653,12 +653,12 @@ def build_strategy_chart(compare_df: pd.DataFrame, title_prefix: str) -> go.Figu
         title=f"{title_prefix} · Totals by 5-Year Period",
         template="plotly_white",
         barmode="group",
-        updatemenus=[dict(buttons=buttons, direction="down", x=0, xanchor="left", y=1.14, yanchor="top")],
+        updatemenus=[dict(buttons=buttons, direction="down", x=0.0, xanchor="left", y=0.985, yanchor="top", font=dict(size=9), pad=dict(t=0, r=0, b=0, l=0), bgcolor="rgba(255,255,255,0.96)", bordercolor="rgba(49,51,63,0.15)", borderwidth=1)],
         xaxis_title="5-Year Interval",
         yaxis_title="£ Total over 5-Year Period",
         height=500,
         legend=dict(orientation="h", y=-0.3, x=0, font=dict(size=10)),
-        margin=dict(t=95, l=10, r=10, b=120),
+        margin=dict(t=130, l=10, r=10, b=120),
     )
     return fig
 
