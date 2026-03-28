@@ -10,6 +10,8 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Mortgage Roulette", layout="wide", initial_sidebar_state="collapsed")
 
+st.markdown('<div id="home"></div>', unsafe_allow_html=True)
+
 st.markdown(
     """
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
@@ -407,77 +409,58 @@ def build_required_cash_chart(df_required_cash: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def build_amortisation_drilldown_chart(df_monthly: pd.DataFrame, scenario_title: str) -> go.Figure:
+
+def build_amortisation_chart(df_monthly: pd.DataFrame, scenario_title: str, selected_view: str = "Overview") -> go.Figure:
     df_yearly = yearly_from_monthly(df_monthly).copy()
-    years = sorted(df_monthly["year"].unique())
 
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=df_yearly["year"], y=df_yearly["principal"], name="Principal (Yearly)", visible=True,
-        hovertemplate="Year %{x}<br>Principal: £%{y:,.2f}<extra></extra>"
-    ))
-    fig.add_trace(go.Bar(
-        x=df_yearly["year"], y=df_yearly["interest"], name="Interest (Yearly)", visible=True,
-        hovertemplate="Year %{x}<br>Interest: £%{y:,.2f}<extra></extra>"
-    ))
-    fig.add_trace(go.Scatter(
-        x=df_yearly["year"], y=df_yearly["balance"], name="Balance (Yearly)", mode="lines+markers",
-        visible=True, yaxis="y2",
-        hovertemplate="Year %{x}<br>Balance: £%{y:,.2f}<extra></extra>"
-    ))
-
-    for yr in years:
-        sub = df_monthly[df_monthly["year"] == yr].copy()
+    if selected_view == "Overview":
+        fig = go.Figure()
         fig.add_trace(go.Bar(
-            x=sub["month_in_year"], y=sub["principal"], name=f"Principal Y{yr}", visible=False,
-            hovertemplate=f"Year {yr} Month %{{x}}<br>Principal: £%{{y:,.2f}}<extra></extra>"
+            x=df_yearly["year"], y=df_yearly["principal"], name="Principal",
+            hovertemplate="Year %{x}<br>Principal: £%{y:,.2f}<extra></extra>"
         ))
         fig.add_trace(go.Bar(
-            x=sub["month_in_year"], y=sub["interest"], name=f"Interest Y{yr}", visible=False,
-            hovertemplate=f"Year {yr} Month %{{x}}<br>Interest: £%{{y:,.2f}}<extra></extra>"
+            x=df_yearly["year"], y=df_yearly["interest"], name="Interest",
+            hovertemplate="Year %{x}<br>Interest: £%{y:,.2f}<extra></extra>"
         ))
         fig.add_trace(go.Scatter(
-            x=sub["month_in_year"], y=sub["balance"], name=f"Balance Y{yr}", mode="lines+markers",
-            visible=False, yaxis="y2",
-            hovertemplate=f"Year {yr} Month %{{x}}<br>Balance: £%{{y:,.2f}}<extra></extra>"
+            x=df_yearly["year"], y=df_yearly["balance"], name="Balance",
+            mode="lines+markers", yaxis="y2",
+            hovertemplate="Year %{x}<br>Balance: £%{y:,.2f}<extra></extra>"
         ))
+        title = f"{scenario_title} · Principal, Interest and Balance"
+        xaxis_title = "Year"
+    else:
+        year_num = int(selected_view.replace("Year ", ""))
+        sub = df_monthly[df_monthly["year"] == year_num].copy()
 
-    total_traces = 3 + len(years) * 3
-    buttons = []
-    yearly_visible = [True, True, True] + [False] * (total_traces - 3)
-    buttons.append(dict(
-        label="Overview",
-        method="update",
-        args=[
-            {"visible": yearly_visible},
-            {"title": f"{scenario_title} · Principal, Interest and Balance", "xaxis.title": "Year", "barmode": "group"}
-        ]
-    ))
-
-    for i, yr in enumerate(years):
-        visible = [False] * total_traces
-        start = 3 + i * 3
-        visible[start:start+3] = [True, True, True]
-        buttons.append(dict(
-            label=f"Year {yr}",
-            method="update",
-            args=[
-                {"visible": visible},
-                {"title": f"{scenario_title} · Monthly Drilldown for Year {yr}", "xaxis.title": f"Month in Year {yr}", "barmode": "group"}
-            ]
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=sub["month_in_year"], y=sub["principal"], name="Principal",
+            hovertemplate=f"Year {year_num} Month %{{x}}<br>Principal: £%{{y:,.2f}}<extra></extra>"
         ))
+        fig.add_trace(go.Bar(
+            x=sub["month_in_year"], y=sub["interest"], name="Interest",
+            hovertemplate=f"Year {year_num} Month %{{x}}<br>Interest: £%{{y:,.2f}}<extra></extra>"
+        ))
+        fig.add_trace(go.Scatter(
+            x=sub["month_in_year"], y=sub["balance"], name="Balance",
+            mode="lines+markers", yaxis="y2",
+            hovertemplate=f"Year {year_num} Month %{{x}}<br>Balance: £%{{y:,.2f}}<extra></extra>"
+        ))
+        title = f"{scenario_title} · Monthly Drilldown for Year {year_num}"
+        xaxis_title = f"Month in Year {year_num}"
 
     fig.update_layout(
-        title=f"{scenario_title} · Principal, Interest and Balance",
+        title=title,
         template="plotly_white",
         barmode="group",
-        updatemenus=[dict(buttons=buttons, direction="down", x=0.0, xanchor="left", y=0.985, yanchor="top", font=dict(size=9), pad=dict(t=0, r=0, b=0, l=0), bgcolor="rgba(255,255,255,0.96)", bordercolor="rgba(49,51,63,0.15)", borderwidth=1)],
-        xaxis=dict(title="Year"),
+        xaxis=dict(title=xaxis_title),
         yaxis=dict(title="Principal / Interest (£)"),
         yaxis2=dict(title="Balance (£)", overlaying="y", side="right", showgrid=False),
         legend=dict(orientation="h", y=-0.24, x=0, font=dict(size=10)),
         height=460,
-        margin=dict(t=130, l=10, r=10, b=105),
+        margin=dict(t=80, l=10, r=10, b=105),
     )
     return fig
 
@@ -673,6 +656,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+help_left, help_right = st.columns([3, 1])
+with help_left:
+    with st.expander("ℹ️ How to use"):
+        st.markdown(
+            """
+            - **Mobile:** landscape mode works best for the charts.
+            - **Graphs:** tap or hover the chart icons to download **PNG**, zoom, pan, or reset.
+            - **Extra options:** each chart also has **Download HTML** and **Copy chart JSON** buttons underneath.
+            - **Homepage:** use the link below at any time to jump back to the top of the app.
+
+            [Back to main homepage](#home)
+            """
+        )
+
 with st.sidebar:
     st.header("Inputs")
     property_price = st.number_input("Property price (£)", min_value=0, value=0, step=5000, placeholder="Enter property price")
@@ -782,14 +779,32 @@ with cash_tab:
         st.dataframe(required_cash_df, use_container_width=True, height=300)
     st.markdown('</div>', unsafe_allow_html=True)
 
+
 with amort_tab:
+    st.markdown('[Back to main homepage](#home)')
     for key in ["25Y", "35Y", "40Y"]:
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.subheader(base_scenarios[key]["label"].replace("Scenario", "amortisation"))
-        st.markdown(f'<div class="subtle">Use the chart menu to switch between yearly overview and monthly drilldown. Charts use a fixed like-for-like comparison deposit of {fmt_gbp(BASE_COMPARISON_DEPOSIT)}. PNG download, HTML download, and chart JSON copy are available below.</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="subtle">Use the view menu below to switch between yearly overview and monthly drilldown. On a phone, landscape mode works best. Charts use a fixed like-for-like comparison deposit of {fmt_gbp(BASE_COMPARISON_DEPOSIT)}. Download PNG from the chart icons, or use the HTML / JSON actions below.</div>',
+            unsafe_allow_html=True
+        )
+
+        years_available = sorted(amort_tables[key]["year"].unique().tolist())
+        view_options = ["Overview"] + [f"Year {yr}" for yr in years_available]
+        select_col, _ = st.columns([1.4, 3.6])
+        with select_col:
+            selected_view = st.selectbox(
+                "View",
+                view_options,
+                index=0,
+                key=f"amort_view_{key}",
+                label_visibility="collapsed",
+            )
+
         render_chart_with_actions(
-            build_amortisation_drilldown_chart(amort_tables[key], base_scenarios[key]["label"]),
-            f"amort_{key.lower()}",
+            build_amortisation_chart(amort_tables[key], base_scenarios[key]["label"], selected_view),
+            f"amort_{key.lower()}_{selected_view.lower().replace(' ', '_')}",
             f"{key} Amortisation",
         )
         st.markdown('</div>', unsafe_allow_html=True)
