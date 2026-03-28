@@ -99,6 +99,13 @@ st.markdown(
             gap: 0.5rem !important;
         }
     }
+
+    div[data-testid="stPopover"] > div > button {
+        transform: scale(0.7);
+        transform-origin: top right;
+        min-height: 0 !important;
+        padding: 0.1rem 0.25rem !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -658,6 +665,7 @@ with header_left:
         unsafe_allow_html=True,
     )
 with header_right:
+    st.markdown('<div style="margin-top: 0.35rem;"></div>', unsafe_allow_html=True)
     with st.popover("ℹ️"):
         st.markdown(
             """
