@@ -10,11 +10,25 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Mortgage Roulette", layout="wide", initial_sidebar_state="collapsed")
 
+# Hidden anchor for top of page
 st.markdown('<div id="home"></div>', unsafe_allow_html=True)
 
+# Mobile viewport
+components.html(
+    """
+    <script>
+    const meta = document.createElement('meta');
+    meta.name = 'viewport';
+    meta.content = 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no';
+    document.head.appendChild(meta);
+    </script>
+    """,
+    height=0,
+)
+
+# App-wide CSS
 st.markdown(
     """
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
     <style>
     .block-container {
         padding-top: 1.2rem;
@@ -58,21 +72,6 @@ st.markdown(
     .scenario-kv div:nth-child(odd) { color: #6b7280; }
     .scenario-kv div:nth-child(even) { font-weight: 600; }
     [data-testid="stMetricValue"] { font-size: 1.45rem; }
-    @media (max-width: 768px) {
-        .block-container {
-            padding-top: 0.7rem;
-            padding-bottom: 1rem;
-            padding-left: 0.75rem;
-            padding-right: 0.75rem;
-        }
-        h1 { font-size: 1.6rem; }
-        h2 { font-size: 1.15rem; }
-        .subtle { font-size: 0.87rem; }
-        .section-card, .scenario-summary {
-            padding: 0.75rem 0.8rem;
-            border-radius: 10px;
-        }
-    }
 
     @media (max-width: 768px) {
         .block-container {
@@ -110,7 +109,6 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
 
 # =========================
 # HELPERS
