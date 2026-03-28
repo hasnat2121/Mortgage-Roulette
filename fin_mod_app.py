@@ -468,7 +468,7 @@ def build_5yr_comparison_against_base(df_base: pd.DataFrame, df_compare: pd.Data
     return pd.DataFrame(rows)
 
 
-def build_strategy_chart(compare_df: pd.DataFrame) -> go.Figure:
+def build_strategy_chart(compare_df: pd.DataFrame, title_prefix: str) -> go.Figure:
     fig = go.Figure()
     comparisons = compare_df["comparison"].unique().tolist()
 
@@ -523,7 +523,7 @@ def build_strategy_chart(compare_df: pd.DataFrame) -> go.Figure:
             method="update",
             args=[
                 {"visible": [True] * n + [False] * n},
-                {"title": "5-Year Totals · Extra Interest and Extra Principal", "yaxis.title": "£ Total over 5-Year Period", "barmode": "group"}
+                {"title": f"{title_prefix} · Totals by 5-Year Period", "yaxis.title": "£ Total over 5-Year Period", "barmode": "group"}
             ]
         ),
         dict(
@@ -531,13 +531,13 @@ def build_strategy_chart(compare_df: pd.DataFrame) -> go.Figure:
             method="update",
             args=[
                 {"visible": [False] * n + [True] * n},
-                {"title": "5-Year Monthly Averages · Extra Interest and Extra Principal", "yaxis.title": "£ per Month", "barmode": "group"}
+                {"title": f"{title_prefix} · Monthly Averages by 5-Year Period", "yaxis.title": "£ per Month", "barmode": "group"}
             ]
         ),
     ]
 
     fig.update_layout(
-        title="5-Year Totals · Extra Interest and Extra Principal",
+        title=f"{title_prefix} · Totals by 5-Year Period",
         template="plotly_white",
         barmode="group",
         updatemenus=[dict(buttons=buttons, direction="down", x=0, xanchor="left", y=1.14, yanchor="top")],
@@ -609,7 +609,9 @@ scenario_objects = build_scenario_objects_from_required_cash(required_cash_df, f
 amort_tables = {k: amort_table(v) for k, v in scenario_objects.items()}
 compare_35_vs_25 = build_5yr_comparison_against_base(amort_tables["25Y"], amort_tables["35Y"], "35Y vs 25Y")
 compare_40_vs_25 = build_5yr_comparison_against_base(amort_tables["25Y"], amort_tables["40Y"], "40Y vs 25Y")
-compare_5yr = pd.concat([compare_35_vs_25, compare_40_vs_25], ignore_index=True)
+compare_against_25 = pd.concat([compare_35_vs_25, compare_40_vs_25], ignore_index=True)
+
+compare_40_vs_35 = build_5yr_comparison_against_base(amort_tables["35Y"], amort_tables["40Y"], "40Y vs 35Y")
 
 # top metrics row
 m1, m2, m3, m4 = st.columns(4)
@@ -667,9 +669,25 @@ with amort_tab:
 
 with strategy_tab:
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.subheader("5-year interval comparison")
-    st.markdown('<div class="subtle">Toggle between total impact by 5-year block and the monthly average cost of delaying debt. Labels on each bar show the cash amount directly.</div>', unsafe_allow_html=True)
-    render_chart_with_actions(build_strategy_chart(compare_5yr), "strategy_5yr", "5-Year Strategy")
-    with st.expander("Show 5-year comparison table"):
-        st.dataframe(compare_5yr.round(2), use_container_width=True, height=300)
+    st.subheader("5-year interval comparison · anchored to 25-year")
+    st.markdown('<div class="subtle">This compares 35Y vs 25Y and 40Y vs 25Y. Extra interest means the longer plan paid more interest; extra principal means the 25Y plan paid down more principal over the same 5-year block. Use the menu to switch between totals and monthly averages.</div>', unsafe_allow_html=True)
+    render_chart_with_actions(
+        build_strategy_chart(compare_against_25, "Anchored to 25-Year"),
+        "strategy_5yr_anchor_25",
+        "5-Year Strategy vs 25-Year",
+    )
+    with st.expander("Show anchored-to-25 comparison table"):
+        st.dataframe(compare_against_25.round(2), use_container_width=True, height=300)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.subheader("5-year interval comparison · anchored to 35-year")
+    st.markdown('<div class="subtle">This compares 40Y vs 35Y. Extra interest means the 40Y plan paid more interest; extra principal means the 35Y plan paid down more principal over the same 5-year block. Use the menu to switch between totals and monthly averages.</div>', unsafe_allow_html=True)
+    render_chart_with_actions(
+        build_strategy_chart(compare_40_vs_35, "Anchored to 35-Year"),
+        "strategy_5yr_anchor_35",
+        "5-Year Strategy vs 35-Year",
+    )
+    with st.expander("Show anchored-to-35 comparison table"):
+        st.dataframe(compare_40_vs_35.round(2), use_container_width=True, height=260)
     st.markdown('</div>', unsafe_allow_html=True)
