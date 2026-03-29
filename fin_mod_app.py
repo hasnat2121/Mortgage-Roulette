@@ -56,12 +56,14 @@ st.markdown(
         padding: 0.85rem 0.95rem;
         border: 1px solid rgba(49,51,63,0.12);
         border-radius: 12px;
-        background: #fff;
+        background: rgba(255,255,255,0.9);
+        color: #111827;
         height: 100%;
     }
     .scenario-summary h4 {
         margin: 0 0 0.55rem 0;
         font-size: 1rem;
+        color: #111827;
     }
     .scenario-kv {
         display: grid;
@@ -69,8 +71,18 @@ st.markdown(
         gap: 0.25rem 0.75rem;
         font-size: 0.92rem;
     }
-    .scenario-kv div:nth-child(odd) { color: #6b7280; }
-    .scenario-kv div:nth-child(even) { font-weight: 600; }
+    .scenario-kv div:nth-child(odd) { color: #4b5563; }
+    .scenario-kv div:nth-child(even) { font-weight: 600; color: #111827; }
+    @media (prefers-color-scheme: dark) {
+        .scenario-summary {
+            background: rgba(17,24,39,0.92);
+            border-color: rgba(255,255,255,0.14);
+            color: #f3f4f6;
+        }
+        .scenario-summary h4 { color: #f9fafb; }
+        .scenario-kv div:nth-child(odd) { color: #d1d5db; }
+        .scenario-kv div:nth-child(even) { color: #f9fafb; }
+    }
     [data-testid="stMetricValue"] { font-size: 1.45rem; }
 
     @media (max-width: 768px) {
@@ -495,158 +507,105 @@ def build_5yr_comparison_against_base(df_base: pd.DataFrame, df_compare: pd.Data
     return pd.DataFrame(rows)
 
 
-def build_strategy_simple_chart(compare_df: pd.DataFrame, title_prefix: str) -> go.Figure:
+
+def build_strategy_simple_chart(compare_df: pd.DataFrame, title_prefix: str, view_mode: str = "Totals") -> go.Figure:
     fig = go.Figure()
 
-    fig.add_trace(go.Bar(
-        x=compare_df["period"],
-        y=compare_df["total_extra_interest"],
-        name="Extra Interest",
-        visible=True,
-        text=[f"£{v:,.0f}" for v in compare_df["total_extra_interest"]],
-        textposition="outside",
-        hovertemplate="%{x}<br>Extra interest: £%{y:,.2f}<extra></extra>",
-    ))
-    fig.add_trace(go.Bar(
-        x=compare_df["period"],
-        y=compare_df["total_extra_principal"],
-        name="Extra Principal",
-        visible=True,
-        text=[f"£{v:,.0f}" for v in compare_df["total_extra_principal"]],
-        textposition="outside",
-        hovertemplate="%{x}<br>Extra principal: £%{y:,.2f}<extra></extra>",
-    ))
+    show_monthly = (view_mode == "Monthly Avg")
+    if show_monthly:
+        y_interest = compare_df["avg_extra_interest_per_month"]
+        y_principal = compare_df["avg_extra_principal_per_month"]
+        yaxis_title = "£ per Month"
+        chart_title = f"{title_prefix} · Monthly Averages by 5-Year Period"
+    else:
+        y_interest = compare_df["total_extra_interest"]
+        y_principal = compare_df["total_extra_principal"]
+        yaxis_title = "£ Total over 5-Year Period"
+        chart_title = f"{title_prefix} · Totals by 5-Year Period"
 
     fig.add_trace(go.Bar(
         x=compare_df["period"],
-        y=compare_df["avg_extra_interest_per_month"],
-        name="Avg Interest / Month",
-        visible=False,
-        text=[f"£{v:,.0f}" for v in compare_df["avg_extra_interest_per_month"]],
+        y=y_interest,
+        name="Extra Interest" if not show_monthly else "Avg Interest / Month",
+        text=[f"£{v:,.0f}" for v in y_interest],
         textposition="outside",
-        hovertemplate="%{x}<br>Avg interest / month: £%{y:,.2f}<extra></extra>",
+        hovertemplate="%{x}<br>" + ("Extra interest" if not show_monthly else "Avg interest / month") + ": £%{y:,.2f}<extra></extra>",
     ))
     fig.add_trace(go.Bar(
         x=compare_df["period"],
-        y=compare_df["avg_extra_principal_per_month"],
-        name="Avg Principal / Month",
-        visible=False,
-        text=[f"£{v:,.0f}" for v in compare_df["avg_extra_principal_per_month"]],
+        y=y_principal,
+        name="Extra Principal" if not show_monthly else "Avg Principal / Month",
+        text=[f"£{v:,.0f}" for v in y_principal],
         textposition="outside",
-        hovertemplate="%{x}<br>Avg principal / month: £%{y:,.2f}<extra></extra>",
+        hovertemplate="%{x}<br>" + ("Extra principal" if not show_monthly else "Avg principal / month") + ": £%{y:,.2f}<extra></extra>",
     ))
-
-    buttons = [
-        dict(
-            label="Totals",
-            method="update",
-            args=[
-                {"visible": [True, True, False, False]},
-                {"title": f"{title_prefix} · Totals by 5-Year Period", "yaxis.title": "£ Total over 5-Year Period", "barmode": "group"}
-            ]
-        ),
-        dict(
-            label="Monthly Avg",
-            method="update",
-            args=[
-                {"visible": [False, False, True, True]},
-                {"title": f"{title_prefix} · Monthly Averages by 5-Year Period", "yaxis.title": "£ per Month", "barmode": "group"}
-            ]
-        ),
-    ]
 
     fig.update_layout(
-        title=f"{title_prefix} · Totals by 5-Year Period",
+        title=chart_title,
         template="plotly_white",
         barmode="group",
-        updatemenus=[dict(buttons=buttons, direction="down", x=0.0, xanchor="left", y=0.985, yanchor="top", font=dict(size=9), pad=dict(t=0, r=0, b=0, l=0), bgcolor="rgba(255,255,255,0.96)", bordercolor="rgba(49,51,63,0.15)", borderwidth=1)],
         xaxis_title="5-Year Interval",
-        yaxis_title="£ Total over 5-Year Period",
+        yaxis_title=yaxis_title,
         height=460,
         legend=dict(orientation="h", y=-0.28, x=0, font=dict(size=10)),
-        margin=dict(t=130, l=10, r=10, b=120),
+        margin=dict(t=100, l=10, r=10, b=120),
     )
     return fig
 
 
-def build_strategy_chart(compare_df: pd.DataFrame, title_prefix: str) -> go.Figure:
+
+def build_strategy_chart(compare_df: pd.DataFrame, title_prefix: str, view_mode: str = "Totals") -> go.Figure:
     fig = go.Figure()
     comparisons = compare_df["comparison"].unique().tolist()
+    show_monthly = (view_mode == "Monthly Avg")
 
-    # totals view
     for comp in comparisons:
         sub = compare_df[compare_df["comparison"] == comp]
-        fig.add_trace(go.Bar(
-            x=sub["period"],
-            y=sub["total_extra_interest"],
-            name=f"{comp} · Extra Interest",
-            visible=True,
-            text=[f"£{v:,.0f}" for v in sub["total_extra_interest"]],
-            textposition="outside",
-            hovertemplate="%{x}<br>" + comp + " extra interest: £%{y:,.2f}<extra></extra>",
-        ))
-        fig.add_trace(go.Bar(
-            x=sub["period"],
-            y=sub["total_extra_principal"],
-            name=f"{comp} · Extra Principal",
-            visible=True,
-            text=[f"£{v:,.0f}" for v in sub["total_extra_principal"]],
-            textposition="outside",
-            hovertemplate="%{x}<br>" + comp + " extra principal: £%{y:,.2f}<extra></extra>",
-        ))
+        if show_monthly:
+            y_interest = sub["avg_extra_interest_per_month"]
+            y_principal = sub["avg_extra_principal_per_month"]
+            name_interest = f"{comp} · Avg Interest / Month"
+            name_principal = f"{comp} · Avg Principal / Month"
+            hover_interest = f"{comp} avg interest / month"
+            hover_principal = f"{comp} avg principal / month"
+            yaxis_title = "£ per Month"
+            chart_title = f"{title_prefix} · Monthly Averages by 5-Year Period"
+        else:
+            y_interest = sub["total_extra_interest"]
+            y_principal = sub["total_extra_principal"]
+            name_interest = f"{comp} · Extra Interest"
+            name_principal = f"{comp} · Extra Principal"
+            hover_interest = f"{comp} extra interest"
+            hover_principal = f"{comp} extra principal"
+            yaxis_title = "£ Total over 5-Year Period"
+            chart_title = f"{title_prefix} · Totals by 5-Year Period"
 
-    # monthly averages view
-    for comp in comparisons:
-        sub = compare_df[compare_df["comparison"] == comp]
         fig.add_trace(go.Bar(
             x=sub["period"],
-            y=sub["avg_extra_interest_per_month"],
-            name=f"{comp} · Avg Interest / Month",
-            visible=False,
-            text=[f"£{v:,.0f}" for v in sub["avg_extra_interest_per_month"]],
+            y=y_interest,
+            name=name_interest,
+            text=[f"£{v:,.0f}" for v in y_interest],
             textposition="outside",
-            hovertemplate="%{x}<br>" + comp + " avg interest / month: £%{y:,.2f}<extra></extra>",
+            hovertemplate="%{x}<br>" + hover_interest + ": £%{y:,.2f}<extra></extra>",
         ))
         fig.add_trace(go.Bar(
             x=sub["period"],
-            y=sub["avg_extra_principal_per_month"],
-            name=f"{comp} · Avg Principal / Month",
-            visible=False,
-            text=[f"£{v:,.0f}" for v in sub["avg_extra_principal_per_month"]],
+            y=y_principal,
+            name=name_principal,
+            text=[f"£{v:,.0f}" for v in y_principal],
             textposition="outside",
-            hovertemplate="%{x}<br>" + comp + " avg principal / month: £%{y:,.2f}<extra></extra>",
+            hovertemplate="%{x}<br>" + hover_principal + ": £%{y:,.2f}<extra></extra>",
         ))
-
-    n = len(comparisons) * 2
-    buttons = [
-        dict(
-            label="Totals",
-            method="update",
-            args=[
-                {"visible": [True] * n + [False] * n},
-                {"title": f"{title_prefix} · Totals by 5-Year Period", "yaxis.title": "£ Total over 5-Year Period", "barmode": "group"}
-            ]
-        ),
-        dict(
-            label="Monthly Avg",
-            method="update",
-            args=[
-                {"visible": [False] * n + [True] * n},
-                {"title": f"{title_prefix} · Monthly Averages by 5-Year Period", "yaxis.title": "£ per Month", "barmode": "group"}
-            ]
-        ),
-    ]
 
     fig.update_layout(
-        title=f"{title_prefix} · Totals by 5-Year Period",
+        title=chart_title,
         template="plotly_white",
         barmode="group",
-        updatemenus=[dict(buttons=buttons, direction="down", x=0.0, xanchor="left", y=0.985, yanchor="top", font=dict(size=9), pad=dict(t=0, r=0, b=0, l=0), bgcolor="rgba(255,255,255,0.96)", bordercolor="rgba(49,51,63,0.15)", borderwidth=1)],
         xaxis_title="5-Year Interval",
-        yaxis_title="£ Total over 5-Year Period",
+        yaxis_title=yaxis_title,
         height=500,
         legend=dict(orientation="h", y=-0.3, x=0, font=dict(size=10)),
-        margin=dict(t=130, l=10, r=10, b=120),
+        margin=dict(t=100, l=10, r=10, b=120),
     )
     return fig
 
@@ -790,7 +749,7 @@ with amort_tab:
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.subheader(base_scenarios[key]["label"].replace("Scenario", "amortisation"))
         st.markdown(
-            f'<div class="subtle">Use the view menu below to switch between yearly overview and monthly drilldown. On a phone, landscape mode works best. Charts use a fixed like-for-like comparison deposit of {fmt_gbp(BASE_COMPARISON_DEPOSIT)}. Download PNG from the chart icons, or use the HTML / JSON actions below.</div>',
+            f'<div class="subtle">Use the view menu below to switch between yearly overview and monthly drilldown. On a phone, landscape mode works best. Charts are shown on a like-for-like comparison basis. Download PNG from the chart icons, or use the HTML / JSON actions below.</div>',
             unsafe_allow_html=True
         )
 
@@ -813,22 +772,51 @@ with amort_tab:
         )
         st.markdown('</div>', unsafe_allow_html=True)
 
+
 with strategy_tab:
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.subheader("5-year interval comparison · quick view · 25-year vs 35-year")
-    st.markdown(f'<div class="subtle">A simpler view for users who want the headline comparison only. This shows 35Y vs 25Y using a fixed comparison deposit of {fmt_gbp(BASE_COMPARISON_DEPOSIT)}.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtle">A simpler view for users who want the headline comparison only. This shows 35Y vs 25Y.</div>', unsafe_allow_html=True)
+    view_simple_25_35 = st.selectbox(
+        "View mode",
+        ["Totals", "Monthly Avg"],
+        index=0,
+        key="strategy_view_simple_25_35"
+    )
     render_chart_with_actions(
-        build_strategy_simple_chart(compare_35_vs_25, "25-Year vs 35-Year"),
+        build_strategy_simple_chart(compare_35_vs_25, "25-Year vs 35-Year", view_simple_25_35),
         "strategy_5yr_simple_25_35",
         "5-Year Strategy · 25-Year vs 35-Year",
     )
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.subheader("5-year interval comparison · anchored to 25-year")
-    st.markdown(f'<div class="subtle">This compares 35Y vs 25Y and 40Y vs 25Y using a fixed comparison deposit of {fmt_gbp(BASE_COMPARISON_DEPOSIT)}. Extra interest means the longer plan paid more interest; extra principal means the shorter plan paid down more principal over the same 5-year block. Use the menu to switch between totals and monthly averages.</div>', unsafe_allow_html=True)
+    st.subheader("5-year interval comparison · quick view · 25-year vs 40-year")
+    st.markdown('<div class="subtle">A simpler view for users who want the headline comparison only. This shows 40Y vs 25Y.</div>', unsafe_allow_html=True)
+    view_simple_25_40 = st.selectbox(
+        "View mode",
+        ["Totals", "Monthly Avg"],
+        index=0,
+        key="strategy_view_simple_25_40"
+    )
     render_chart_with_actions(
-        build_strategy_chart(compare_against_25, "Anchored to 25-Year"),
+        build_strategy_simple_chart(compare_40_vs_25, "25-Year vs 40-Year", view_simple_25_40),
+        "strategy_5yr_simple_25_40",
+        "5-Year Strategy · 25-Year vs 40-Year",
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.subheader("5-year interval comparison · anchored to 25-year")
+    st.markdown('<div class="subtle">This compares 35Y vs 25Y and 40Y vs 25Y. Extra interest means the longer plan paid more interest; extra principal means the shorter plan paid down more principal over the same 5-year block.</div>', unsafe_allow_html=True)
+    view_anchor_25 = st.selectbox(
+        "View mode",
+        ["Totals", "Monthly Avg"],
+        index=0,
+        key="strategy_view_anchor_25"
+    )
+    render_chart_with_actions(
+        build_strategy_chart(compare_against_25, "Anchored to 25-Year", view_anchor_25),
         "strategy_5yr_anchor_25",
         "5-Year Strategy vs 25-Year",
     )
@@ -838,9 +826,15 @@ with strategy_tab:
 
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.subheader("5-year interval comparison · anchored to 35-year")
-    st.markdown(f'<div class="subtle">This compares 40Y vs 35Y using a fixed comparison deposit of {fmt_gbp(BASE_COMPARISON_DEPOSIT)}. Extra interest means the 40Y plan paid more interest; extra principal means the 35Y plan paid down more principal over the same 5-year block. Use the menu to switch between totals and monthly averages.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtle">This compares 40Y vs 35Y. Extra interest means the 40Y plan paid more interest; extra principal means the 35Y plan paid down more principal over the same 5-year block.</div>', unsafe_allow_html=True)
+    view_anchor_35 = st.selectbox(
+        "View mode",
+        ["Totals", "Monthly Avg"],
+        index=0,
+        key="strategy_view_anchor_35"
+    )
     render_chart_with_actions(
-        build_strategy_chart(compare_40_vs_35, "Anchored to 35-Year"),
+        build_strategy_chart(compare_40_vs_35, "Anchored to 35-Year", view_anchor_35),
         "strategy_5yr_anchor_35",
         "5-Year Strategy vs 35-Year",
     )
